@@ -23,6 +23,7 @@ class NotificationService {
   static const String _channelId = 'devaneios_channel';
   static const String _channelName = 'Devaneios Notifications';
   static const String _prefsKey = 'last_notification_time';
+  static const String _countKey = 'daily_questionnaire_count';
 
   Future<void> initialize() async {
     tz.initializeTimeZones();
@@ -58,37 +59,82 @@ class NotificationService {
   }
 
   Future<void> scheduleDailyNotifications() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // Definir o início (9h) e fim (21h) do dia atual
+    final startOfDay = today.add(const Duration(hours: 9));
+    final endOfDay = today.add(const Duration(hours: 21));
+
+    // Se já passou das 21h, agendar para o dia seguinte
+    final baseDate = now.isAfter(endOfDay)
+        ? today.add(const Duration(days: 1))
+        : today;
+
+    final startTime = DateTime(baseDate.year, baseDate.month, baseDate.day, 9);
+    final endTime = DateTime(baseDate.year, baseDate.month, baseDate.day, 21);
+
+    // Gerar 8 horários aleatórios entre 9h e 21h
+    final times = _generateRandomTimes(startTime, endTime, 8, 17);
+
+    // Cancelar notificações anteriores
+    await _notificationsPlugin.cancelAll();
+
+    // Salvar os horários no SharedPreferences
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_prefsKey);
-
-    // Primeira notificação imediata
-    await _showNotification(
-      title: 'Hora de preencher o questionário!',
-      body: 'Clique para responder ao questionário de devaneios.',
+    await prefs.setStringList(
+      'notification_times',
+      times.map((time) => time.toIso8601String()).toList(),
     );
+    await prefs.setInt('current_notification_index', 0);
+    await prefs.setInt(
+      _countKey,
+      prefs.getInt(_countKey) ?? 0,
+    ); // Manter contagem existente
 
-    // Agendar as próximas 7 notificações
-    final times = _generateRandomTimes(
-      start: _setTime(9, 0),
-      end: _setTime(21, 0),
-      count: 7,
-      minIntervalMinutes: 17,
-    );
-
-    for (int i = 0; i < times.length; i++) {
-      await _scheduleNotification(
-        id: i + 1,
-        title: 'Hora do questionário (${i + 2}/8)',
-        body: 'Por favor, responda ao questionário de devaneios.',
-        scheduledTime: times[i],
-      );
-    }
+    // Agendar a primeira notificação
+    await _scheduleNextNotification();
   }
 
-  Future<void> _showNotification({
+  Future<void> _scheduleNextNotification() async {
+    final prefs = await SharedPreferences.getInstance();
+    final timesStr = prefs.getStringList('notification_times') ?? [];
+    final currentIndex = prefs.getInt('current_notification_index') ?? 0;
+    final now = DateTime.now();
+
+    if (currentIndex >= timesStr.length) {
+      return; // Todas as notificações do dia foram agendadas
+    }
+
+    final times = timesStr.map((str) => DateTime.parse(str)).toList();
+    final nextTime = times[currentIndex];
+
+    if (nextTime.isBefore(now)) {
+      // Se o horário já passou, avance para o próximo
+      await prefs.setInt('current_notification_index', currentIndex + 1);
+      await _scheduleNextNotification();
+      return;
+    }
+
+    await _scheduleNotification(
+      id: currentIndex,
+      title: 'Hora de preencher o questionário! (${currentIndex + 1}/8)',
+      body: 'Clique para responder ao questionário de devaneios.',
+      scheduledTime: nextTime,
+    );
+
+    await prefs.setString(_prefsKey, now.toIso8601String());
+    _onNotificationReceived.add('notification_scheduled');
+  }
+
+  Future<void> _scheduleNotification({
+    required int id,
     required String title,
     required String body,
+    required DateTime scheduledTime,
   }) async {
+    final tzTime = tz.TZDateTime.from(scheduledTime, tz.local);
+
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
           _channelId,
@@ -98,33 +144,7 @@ class NotificationService {
           playSound: true,
           enableVibration: true,
           color: Colors.blue,
-        );
-
-    const NotificationDetails details = NotificationDetails(
-      android: androidDetails,
-    );
-
-    await _notificationsPlugin.show(0, title, body, details);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsKey, DateTime.now().toString());
-    _onNotificationReceived.add('notification_shown');
-  }
-
-  Future<void> _scheduleNotification({
-    required int id,
-    required String title,
-    required String body,
-    required DateTime scheduledTime,
-  }) async {
-    final tz.TZDateTime tzTime = tz.TZDateTime.from(scheduledTime, tz.local);
-
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          importance: Importance.max,
-          priority: Priority.high,
+          //smallIcon: '@mipmap/ic_launcher', // Adiciona o ícone do app
         );
 
     const NotificationDetails details = NotificationDetails(
@@ -144,30 +164,49 @@ class NotificationService {
     );
   }
 
-  List<DateTime> _generateRandomTimes({
-    required DateTime start,
-    required DateTime end,
-    required int count,
-    required int minIntervalMinutes,
-  }) {
+  List<DateTime> _generateRandomTimes(
+    DateTime start,
+    DateTime end,
+    int count,
+    int minIntervalMinutes,
+  ) {
     final random = Random();
-    final times = <DateTime>[];
+    final List<DateTime> times = [];
 
-    final totalSlots =
-        (end.difference(start).inMinutes ~/ minIntervalMinutes) - 1;
-    final slots = List<int>.generate(totalSlots, (i) => i + 1)..shuffle(random);
+    final totalMinutes = end.difference(start).inMinutes;
+    final minTotalInterval = (count - 1) * minIntervalMinutes;
 
-    for (int i = 0; i < count && i < slots.length; i++) {
-      final minutesToAdd = slots[i] * minIntervalMinutes;
-      times.add(start.add(Duration(minutes: minutesToAdd)));
+    if (totalMinutes < minTotalInterval) {
+      throw Exception(
+        'Não há tempo suficiente para agendar com o intervalo mínimo.',
+      );
     }
 
-    return times;
-  }
+    final availableMinutes = totalMinutes - minTotalInterval;
+    final List<int> intervals = List.generate(
+      count - 1,
+      (_) => minIntervalMinutes,
+    );
 
-  tz.TZDateTime _setTime(int hour, int minute) {
-    final now = tz.TZDateTime.now(tz.local);
-    return tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    int remainingMinutes = availableMinutes;
+    for (int i = 0; i < count - 1; i++) {
+      if (remainingMinutes > 0) {
+        final additionalInterval = random.nextInt(remainingMinutes + 1);
+        intervals[i] += additionalInterval;
+        remainingMinutes -= additionalInterval;
+      }
+    }
+
+    int currentMinutes = 0;
+    for (int i = 0; i < count; i++) {
+      if (i > 0) {
+        currentMinutes += intervals[i - 1];
+      }
+      final notificationTime = start.add(Duration(minutes: currentMinutes));
+      times.add(notificationTime);
+    }
+
+    return times..sort();
   }
 
   Future<bool> canShowNextNotification() async {
@@ -181,14 +220,30 @@ class NotificationService {
 
   Future<void> markQuestionnaireAnswered() async {
     final prefs = await SharedPreferences.getInstance();
+    final currentIndex = prefs.getInt('current_notification_index') ?? 0;
+    final dailyCount = prefs.getInt(_countKey) ?? 0;
+
+    // Incrementar contagem diária
+    await prefs.setInt(_countKey, dailyCount + 1);
+
+    // Avançar para a próxima notificação
+    await prefs.setInt('current_notification_index', currentIndex + 1);
     await prefs.remove(_prefsKey);
     _onNotificationReceived.add('questionnaire_answered');
+
+    // Agendar a próxima notificação
+    await _scheduleNextNotification();
   }
 
-  Future<void> testNotification() async {
-    await _showNotification(
-      title: 'Teste de Questionário',
-      body: 'Clique para testar o questionário',
-    );
+  Future<bool> isWithinNotificationWindow() async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day, 9);
+    final endOfDay = DateTime(now.year, now.month, now.day, 21);
+    return now.isAfter(startOfDay) && now.isBefore(endOfDay);
+  }
+
+  Future<int> getDailyQuestionnaireCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_countKey) ?? 0;
   }
 }

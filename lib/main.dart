@@ -4,7 +4,20 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'screens/auth_check.dart';
 import 'utils/notification_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializar timezone e notificações
+  tz.initializeTimeZones();
+  await NotificationService().initialize();
+
+  // Verificar se o usuário está registrado e agendar notificações
+  final prefs = await SharedPreferences.getInstance();
+  final isRegistered = prefs.getBool('is_registered') ?? false;
+  if (isRegistered) {
+    await NotificationService().scheduleDailyNotifications();
+  }
+
   runApp(const DevaneiosApp());
 }
 
@@ -16,46 +29,14 @@ class DevaneiosApp extends StatefulWidget {
 }
 
 class _DevaneiosAppState extends State<DevaneiosApp> {
-  bool _isInitialized = false;
-
   @override
   void initState() {
     super.initState();
     print('Iniciando inicialização do app...');
-    _initializeApp();
-  }
-
-  Future<void> _initializeApp() async {
-    try {
-      print('Garantindo inicialização do Flutter...');
-      WidgetsFlutterBinding.ensureInitialized();
-
-      print('Inicializando timezone...');
-      tz.initializeTimeZones();
-
-      print('Inicializando notificações...');
-      await NotificationService().initialize();
-
-      print('Inicialização concluída.');
-      setState(() {
-        _isInitialized = true;
-      });
-    } catch (e) {
-      print('Erro durante inicialização: $e');
-      setState(() {
-        _isInitialized = true; // Prossegue mesmo com erro, para debug
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized) {
-      return const MaterialApp(
-        home: Scaffold(body: Center(child: CircularProgressIndicator())),
-      );
-    }
-
     return MaterialApp(
       title: 'Devaneios',
       theme: ThemeData(
@@ -96,6 +77,7 @@ class _DevaneiosAppState extends State<DevaneiosApp> {
 MaterialColor createMaterialColor(Color color) {
   List strengths = <double>[.05];
   Map<int, Color> swatch = {};
+  // ignore: deprecated_member_use
   final int r = color.red, g = color.green, b = color.blue;
 
   for (int i = 1; i < 10; i++) {
@@ -110,6 +92,5 @@ MaterialColor createMaterialColor(Color color) {
       1,
     );
   }
-  // ignore: deprecated_member_use
   return MaterialColor(color.value, swatch);
 }

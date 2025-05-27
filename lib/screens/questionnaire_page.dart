@@ -25,39 +25,29 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
   ];
 
   Future<void> _saveAnswers() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final timestamp = DateTime.now().toIso8601String();
-      final answersJson = _answers.join(',');
-      await prefs.setString('questionnaire_$timestamp', answersJson);
-      await prefs.setBool('notification_triggered', false);
-      int dailyCount = (prefs.getInt('daily_count') ?? 0) + 1;
-      await prefs.setInt('daily_count', dailyCount);
-      print('Questionário salvo. Contagem diária: $dailyCount');
+    if (_formKey.currentState!.validate()) {
+      _formKey.currentState!.save();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final timestamp = DateTime.now().toIso8601String();
+        final answersJson = _answers.join(',');
+        await prefs.setString('questionnaire_$timestamp', answersJson);
 
-      if (dailyCount < 8) {
-        print('Reagendando próximas notificações para hoje...');
-        await NotificationService().scheduleDailyNotifications();
-      } else {
-        print('Limite diário atingido. Agendando para o próximo dia...');
-        await prefs.setInt(
-          'daily_count',
-          0,
-        ); // Resetar a contagem para o próximo dia
-        await NotificationService().scheduleDailyNotifications();
+        // Chama o método do NotificationService para atualizar a contagem e agendar a próxima notificação
+        await NotificationService().markQuestionnaireAnswered();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Respostas salvas com sucesso!')),
+        );
+        Navigator.pop(context);
+      } catch (e) {
+        print('Erro ao salvar respostas: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao salvar respostas. Tente novamente.'),
+          ),
+        );
       }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Respostas salvas com sucesso!')),
-      );
-      Navigator.pop(context);
-    } catch (e) {
-      print('Erro ao salvar respostas: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro ao salvar respostas. Tente novamente.'),
-        ),
-      );
     }
   }
 
@@ -197,11 +187,7 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
                     ),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        _saveAnswers();
-                      }
-                    },
+                    onPressed: _saveAnswers,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4A6A7A),
                       foregroundColor: Colors.white,

@@ -15,13 +15,14 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   bool _showQuestionnaireButton = false;
   bool _isImageLoaded = false;
-  bool _isTestingNotification = false;
+  int _dailyCount = 0;
+  static const int maxDailyQuestionnaires = 8;
   StreamSubscription<String>? _notificationSubscription;
 
   @override
   void initState() {
     super.initState();
-    _checkNotificationStatus();
+    _checkDailyCount();
     _setupNotificationListener();
   }
 
@@ -49,141 +50,179 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _checkNotificationStatus() async {
-    final canShow = await NotificationService().canShowNextNotification();
+  Future<void> _checkDailyCount() async {
+    final count = await NotificationService().getDailyQuestionnaireCount();
     if (mounted) {
       setState(() {
-        _showQuestionnaireButton = !canShow;
+        _dailyCount = count;
       });
     }
   }
 
   void _setupNotificationListener() {
     _notificationSubscription = NotificationService().onNotificationReceived
-        .listen((_) => _checkNotificationStatus());
-  }
-
-  Future<void> _testNotification() async {
-    if (mounted) {
-      setState(() {
-        _isTestingNotification = true;
-      });
-    }
-
-    try {
-      await NotificationService().testNotification();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Notificação de teste enviada!')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao enviar notificação: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isTestingNotification = false;
+        .listen((event) {
+          if (event == 'notification_scheduled') {
+            setState(() {
+              _showQuestionnaireButton = true;
+            });
+          } else if (event == 'questionnaire_answered') {
+            setState(() {
+              _showQuestionnaireButton = false;
+            });
+            _checkDailyCount();
+          } else if (event == 'notification_clicked') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const QuestionnairePage(),
+              ),
+            );
+          }
         });
-      }
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Devaneios'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: _testNotification,
-            tooltip: 'Testar Notificação',
-          ),
-        ],
-      ),
       body: _isImageLoaded
-          ? Stack(
-              children: [
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: const BoxDecoration(
-                      image: DecorationImage(
-                        image: AssetImage('assets/forest_background.png'),
-                        fit: BoxFit.cover,
+          ? Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [const Color(0xFFA7C5D2), const Color(0xFF6E8290)],
+                ),
+                image: const DecorationImage(
+                  image: AssetImage('assets/forest_background.png'),
+                  fit: BoxFit.cover,
+                  opacity: 0.8,
+                ),
+              ),
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    // Cabeçalho
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 20.0,
                       ),
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Container(color: Colors.black.withOpacity(0.3)),
-                ),
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (_showQuestionnaireButton)
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 16,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Devaneios',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black26,
+                                  offset: Offset(1, 1),
+                                  blurRadius: 3,
+                                ),
+                              ],
                             ),
-                            textStyle: const TextStyle(fontSize: 18),
                           ),
-                          onPressed: () async {
-                            await NotificationService()
-                                .markQuestionnaireAnswered();
-                            if (mounted) {
+                          IconButton(
+                            icon: const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                            onPressed: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      const QuestionnairePage(),
+                                  builder: (context) => const ProfilePage(),
                                 ),
                               );
-                            }
-                          },
-                          child: const Text('Preencher Questionário'),
-                        ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 16,
+                            },
+                            tooltip: 'Perfil',
                           ),
-                          textStyle: const TextStyle(fontSize: 18),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ProfilePage(),
-                            ),
-                          );
-                        },
-                        child: const Text('Perfil'),
+                        ],
                       ),
-                      if (_isTestingNotification)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 20),
-                          child: CircularProgressIndicator(),
+                    ),
+                    // Corpo principal
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_showQuestionnaireButton &&
+                                _dailyCount < maxDailyQuestionnaires)
+                              Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 32.0,
+                                ),
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF4A6A7A),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 40,
+                                      vertical: 20,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                    elevation: 5,
+                                    shadowColor: Colors.black38,
+                                  ),
+                                  onPressed: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const QuestionnairePage(),
+                                      ),
+                                    );
+                                    // O evento 'questionnaire_answered' será disparado pela QuestionnairePage
+                                  },
+                                  child: const Text(
+                                    'Preencher Questionário',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(height: 20),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                // ignore: deprecated_member_use
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(15),
+                                border: Border.all(
+                                  // ignore: deprecated_member_use
+                                  color: Colors.white.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Text(
+                                'Questionários preenchidos hoje: $_dailyCount',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                    ],
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             )
           : const Center(child: CircularProgressIndicator()),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _testNotification,
-        tooltip: 'Testar Notificação',
-        child: const Icon(Icons.notification_add),
-      ),
     );
   }
 }
