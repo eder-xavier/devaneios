@@ -1,0 +1,4 @@
+Azul escuro (troncos e sombras): #1C2526 (um tom escuro para AppBar e elementos principais).
+Azul médio (folhas e fundo): #4A6A7A (para botões e detalhes).
+Azul claro (fundo etéreo): #A7C5D2 (para fundos e textos suaves).
+Cinza-azulado (detalhes sutis): #6E8290 (para bordas ou elementos secundários).
