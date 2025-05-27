@@ -1,121 +1,194 @@
 import 'dart:math';
-import 'dart:ui';
-import 'package:awesome_notifications/awesome_notifications.dart';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../main.dart'; // Importe o main.dart para acessar o NotificationActionHandler
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
 
 class NotificationService {
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal() {
+    _onNotificationReceived = BehaviorSubject<String>();
+  }
+
+  late final BehaviorSubject<String> _onNotificationReceived;
+  Stream<String> get onNotificationReceived => _onNotificationReceived.stream;
+
+  final FlutterLocalNotificationsPlugin _notificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
+  static const String _channelId = 'devaneios_channel';
+  static const String _channelName = 'Devaneios Notifications';
+  static const String _prefsKey = 'last_notification_time';
+
   Future<void> initialize() async {
-    try {
-      await AwesomeNotifications().initialize(
-        'resource://drawable/ic_launcher', // Ícone para notificações
-        [
-          NotificationChannel(
-            channelKey: 'devaneios_channel',
-            channelName: 'Devaneios Notifications',
-            channelDescription: 'Notificações para o questionário de Devaneios',
-            importance: NotificationImportance.Max,
-            playSound: true,
-            enableLights: true,
-            enableVibration: true,
-            defaultColor: const Color(0xFF4A6A7A), // Cor padrão do canal
-            ledColor: const Color(0xFF4A6A7A), // Cor do LED
-          ),
-        ],
-        debug: true,
-      );
-      print('Notificações inicializadas com sucesso (Awesome Notifications).');
+    tz.initializeTimeZones();
 
-      // Solicitar permissão para notificações
-      final granted = await AwesomeNotifications()
-          .requestPermissionToSendNotifications();
-      if (granted) {
-        print('Permissão de notificação concedida.');
-      } else {
-        print('Permissão de notificação negada.');
-      }
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
-      // Registrar o método para ações de notificação
-      AwesomeNotifications().setListeners(
-        onActionReceivedMethod:
-            NotificationActionHandler.onActionReceivedMethod,
-      );
-    } catch (e) {
-      print('Erro ao inicializar notificações: $e');
-    }
-  }
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
 
-  Future<String> scheduleDailyNotifications() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // Disparar notificação imediatamente
-      await AwesomeNotifications().createNotification(
-        content: NotificationContent(
-          id: 0,
-          channelKey: 'devaneios_channel',
-          title: 'Hora de preencher o questionário!',
-          body: 'Clique para responder ao questionário de devaneios.',
-          payload: {'action': 'open_questionnaire'},
-          notificationLayout: NotificationLayout.Default,
-        ),
-      );
-      print('Notificação disparada imediatamente.');
-
-      await prefs.setBool('notification_triggered', true);
-      return 'Notificação disparada imediatamente.';
-    } catch (e) {
-      print('Erro ao disparar notificação: $e');
-      return 'Erro ao disparar notificação: $e';
-    }
-  }
-
-  List<DateTime> _generateRandomTimes(
-    DateTime start,
-    DateTime end,
-    int count,
-    int minIntervalMinutes,
-  ) {
-    final random = Random();
-    final List<DateTime> times = [];
-
-    // Total de minutos entre start e end
-    final totalMinutes = end.difference(start).inMinutes;
-    final minTotalInterval = (count - 1) * minIntervalMinutes;
-
-    if (totalMinutes < minTotalInterval) {
-      throw Exception(
-        'Não há tempo suficiente para agendar com o intervalo mínimo.',
-      );
-    }
-
-    // Gerar horários aleatórios
-    final availableMinutes = totalMinutes - minTotalInterval;
-    final List<int> intervals = List.generate(
-      count - 1,
-      (_) => minIntervalMinutes,
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      _channelId,
+      _channelName,
+      description: 'Notificações para o questionário de Devaneios',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+      ledColor: Colors.blue,
     );
 
-    // Distribuir o tempo restante aleatoriamente
-    int remainingMinutes = availableMinutes;
-    for (int i = 0; i < count - 1; i++) {
-      if (remainingMinutes > 0) {
-        final additionalInterval = random.nextInt(remainingMinutes + 1);
-        intervals[i] += additionalInterval;
-        remainingMinutes -= additionalInterval;
-      }
-    }
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(channel);
 
-    // Converter os intervalos em horários
-    int currentMinutes = 0;
-    for (int i = 0; i < count; i++) {
-      if (i > 0) {
-        currentMinutes += intervals[i - 1];
-      }
-      final notificationTime = start.add(Duration(minutes: currentMinutes));
-      times.add(notificationTime);
+    await _notificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (details) {
+        _onNotificationReceived.add('notification_clicked');
+      },
+    );
+  }
+
+  Future<void> scheduleDailyNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsKey);
+
+    // Primeira notificação imediata
+    await _showNotification(
+      title: 'Hora de preencher o questionário!',
+      body: 'Clique para responder ao questionário de devaneios.',
+    );
+
+    // Agendar as próximas 7 notificações
+    final times = _generateRandomTimes(
+      start: _setTime(9, 0),
+      end: _setTime(21, 0),
+      count: 7,
+      minIntervalMinutes: 17,
+    );
+
+    for (int i = 0; i < times.length; i++) {
+      await _scheduleNotification(
+        id: i + 1,
+        title: 'Hora do questionário (${i + 2}/8)',
+        body: 'Por favor, responda ao questionário de devaneios.',
+        scheduledTime: times[i],
+      );
+    }
+  }
+
+  Future<void> _showNotification({
+    required String title,
+    required String body,
+  }) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          color: Colors.blue,
+        );
+
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+    );
+
+    await _notificationsPlugin.show(0, title, body, details);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKey, DateTime.now().toString());
+    _onNotificationReceived.add('notification_shown');
+  }
+
+  Future<void> _scheduleNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledTime,
+  }) async {
+    final tz.TZDateTime tzTime = tz.TZDateTime.from(scheduledTime, tz.local);
+
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          importance: Importance.max,
+          priority: Priority.high,
+        );
+
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+    );
+
+    await _notificationsPlugin.zonedSchedule(
+      id,
+      title,
+      body,
+      tzTime,
+      details,
+      // ignore: deprecated_member_use
+      androidAllowWhileIdle: true,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  List<DateTime> _generateRandomTimes({
+    required DateTime start,
+    required DateTime end,
+    required int count,
+    required int minIntervalMinutes,
+  }) {
+    final random = Random();
+    final times = <DateTime>[];
+
+    final totalSlots =
+        (end.difference(start).inMinutes ~/ minIntervalMinutes) - 1;
+    final slots = List<int>.generate(totalSlots, (i) => i + 1)..shuffle(random);
+
+    for (int i = 0; i < count && i < slots.length; i++) {
+      final minutesToAdd = slots[i] * minIntervalMinutes;
+      times.add(start.add(Duration(minutes: minutesToAdd)));
     }
 
     return times;
+  }
+
+  tz.TZDateTime _setTime(int hour, int minute) {
+    final now = tz.TZDateTime.now(tz.local);
+    return tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+  }
+
+  Future<bool> canShowNextNotification() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastTimeStr = prefs.getString(_prefsKey);
+    if (lastTimeStr == null) return false;
+
+    final lastTime = DateTime.parse(lastTimeStr);
+    return DateTime.now().difference(lastTime).inMinutes < 17;
+  }
+
+  Future<void> markQuestionnaireAnswered() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsKey);
+    _onNotificationReceived.add('questionnaire_answered');
+  }
+
+  Future<void> testNotification() async {
+    await _showNotification(
+      title: 'Teste de Questionário',
+      body: 'Clique para testar o questionário',
+    );
   }
 }

@@ -3,10 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'screens/auth_check.dart';
 import 'utils/notification_service.dart';
-import 'package:awesome_notifications/awesome_notifications.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
   runApp(const DevaneiosApp());
 }
 
@@ -32,11 +30,11 @@ class _DevaneiosAppState extends State<DevaneiosApp> {
       print('Garantindo inicialização do Flutter...');
       WidgetsFlutterBinding.ensureInitialized();
 
+      print('Inicializando timezone...');
+      tz.initializeTimeZones();
+
       print('Inicializando notificações...');
       await NotificationService().initialize();
-
-      print('Inicializando timezone...');
-      await Future(() => tz.initializeTimeZones());
 
       print('Inicialização concluída.');
       setState(() {
@@ -114,15 +112,4 @@ MaterialColor createMaterialColor(Color color) {
   }
   // ignore: deprecated_member_use
   return MaterialColor(color.value, swatch);
-}
-
-// Classe para lidar com ações de notificação
-class NotificationActionHandler {
-  @pragma("vm:entry-point")
-  static Future<void> onActionReceivedMethod(
-    ReceivedAction receivedAction,
-  ) async {
-    print('Ação recebida: ${receivedAction.payload}');
-    // Aqui você pode adicionar lógica para lidar com a ação, como navegar para uma tela
-  }
 }

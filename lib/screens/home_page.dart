@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'profile_page.dart';
-import 'questionnaire_page.dart';
+import 'package:devaneios/utils/notification_service.dart';
+import 'package:devaneios/screens/profile_page.dart';
+import 'package:devaneios/screens/questionnaire_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,11 +15,20 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   bool _showQuestionnaireButton = false;
   bool _isImageLoaded = false;
+  bool _isTestingNotification = false;
+  StreamSubscription<String>? _notificationSubscription;
 
   @override
   void initState() {
     super.initState();
     _checkNotificationStatus();
+    _setupNotificationListener();
+  }
+
+  @override
+  void dispose() {
+    _notificationSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -39,17 +50,61 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _checkNotificationStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _showQuestionnaireButton =
-          prefs.getBool('notification_triggered') ?? false;
-    });
+    final canShow = await NotificationService().canShowNextNotification();
+    if (mounted) {
+      setState(() {
+        _showQuestionnaireButton = !canShow;
+      });
+    }
+  }
+
+  void _setupNotificationListener() {
+    _notificationSubscription = NotificationService().onNotificationReceived
+        .listen((_) => _checkNotificationStatus());
+  }
+
+  Future<void> _testNotification() async {
+    if (mounted) {
+      setState(() {
+        _isTestingNotification = true;
+      });
+    }
+
+    try {
+      await NotificationService().testNotification();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notificação de teste enviada!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao enviar notificação: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isTestingNotification = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Devaneios')),
+      appBar: AppBar(
+        title: const Text('Devaneios'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            onPressed: _testNotification,
+            tooltip: 'Testar Notificação',
+          ),
+        ],
+      ),
       body: _isImageLoaded
           ? Stack(
               children: [
@@ -79,13 +134,18 @@ class _HomePageState extends State<HomePage> {
                             ),
                             textStyle: const TextStyle(fontSize: 18),
                           ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const QuestionnairePage(),
-                              ),
-                            );
+                          onPressed: () async {
+                            await NotificationService()
+                                .markQuestionnaireAnswered();
+                            if (mounted) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const QuestionnairePage(),
+                                ),
+                              );
+                            }
                           },
                           child: const Text('Preencher Questionário'),
                         ),
@@ -108,12 +168,22 @@ class _HomePageState extends State<HomePage> {
                         },
                         child: const Text('Perfil'),
                       ),
+                      if (_isTestingNotification)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 20),
+                          child: CircularProgressIndicator(),
+                        ),
                     ],
                   ),
                 ),
               ],
             )
           : const Center(child: CircularProgressIndicator()),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _testNotification,
+        tooltip: 'Testar Notificação',
+        child: const Icon(Icons.notification_add),
+      ),
     );
   }
 }

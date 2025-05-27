@@ -1,6 +1,6 @@
 # devaneios
 
-A new Flutter project.
+A App with a simple goal, help people to control mind wonderting levels 
 
 ## Getting Started
 
