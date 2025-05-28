@@ -9,13 +9,17 @@ void main() async {
 
   // Inicializar timezone e notificações
   tz.initializeTimeZones();
-  await NotificationService().initialize();
+  final notificationService = NotificationService();
+  await notificationService.initialize();
 
   // Verificar se o usuário está registrado e agendar notificações
   final prefs = await SharedPreferences.getInstance();
   final isRegistered = prefs.getBool('is_registered') ?? false;
   if (isRegistered) {
-    await NotificationService().scheduleDailyNotifications();
+    print('Usuário registrado. Agendando notificações...');
+    await notificationService.scheduleDailyNotifications();
+  } else {
+    print('Usuário não registrado. Agendamento de notificações adiado.');
   }
 
   runApp(const DevaneiosApp());

@@ -33,13 +33,13 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
         final answersJson = _answers.join(',');
         await prefs.setString('questionnaire_$timestamp', answersJson);
 
-        // Chama o método do NotificationService para atualizar a contagem e agendar a próxima notificação
+        // Chama o método do NotificationService apenas se o salvamento for bem-sucedido
         await NotificationService().markQuestionnaireAnswered();
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Respostas salvas com sucesso!')),
         );
-        Navigator.pop(context);
+        if (mounted) Navigator.pop(context);
       } catch (e) {
         print('Erro ao salvar respostas: $e');
         ScaffoldMessenger.of(context).showSnackBar(

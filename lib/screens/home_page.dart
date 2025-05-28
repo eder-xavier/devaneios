@@ -62,6 +62,7 @@ class _HomePageState extends State<HomePage> {
   void _setupNotificationListener() {
     _notificationSubscription = NotificationService().onNotificationReceived
         .listen((event) {
+          print('Evento recebido: $event');
           if (event == 'notification_scheduled') {
             setState(() {
               _showQuestionnaireButton = true;
@@ -91,7 +92,10 @@ class _HomePageState extends State<HomePage> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [const Color(0xFFA7C5D2), const Color(0xFF6E8290)],
+                  colors: [
+                    const Color(0xFFA7C5D2).withOpacity(0.9),
+                    const Color(0xFF6E8290).withOpacity(0.9),
+                  ],
                 ),
                 image: const DecorationImage(
                   image: AssetImage('assets/forest_background.png'),
@@ -197,11 +201,9 @@ class _HomePageState extends State<HomePage> {
                                 vertical: 10,
                               ),
                               decoration: BoxDecoration(
-                                // ignore: deprecated_member_use
                                 color: Colors.white.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(15),
                                 border: Border.all(
-                                  // ignore: deprecated_member_use
                                   color: Colors.white.withOpacity(0.3),
                                 ),
                               ),

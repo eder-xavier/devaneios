@@ -10,6 +10,7 @@ import 'package:timezone/data/latest.dart' as tz;
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
+
   NotificationService._internal() {
     _onNotificationReceived = BehaviorSubject<String>();
   }
@@ -56,6 +57,7 @@ class NotificationService {
         _onNotificationReceived.add('notification_clicked');
       },
     );
+    print('NotificationService inicializado com sucesso.');
   }
 
   Future<void> scheduleDailyNotifications() async {
@@ -74,8 +76,11 @@ class NotificationService {
     final startTime = DateTime(baseDate.year, baseDate.month, baseDate.day, 9);
     final endTime = DateTime(baseDate.year, baseDate.month, baseDate.day, 21);
 
+    print('Gerando horários entre $startTime e $endTime');
+
     // Gerar 8 horários aleatórios entre 9h e 21h
     final times = _generateRandomTimes(startTime, endTime, 8, 17);
+    print('Horários gerados: ${times.map((t) => t.toIso8601String())}');
 
     // Cancelar notificações anteriores
     await _notificationsPlugin.cancelAll();
@@ -103,19 +108,21 @@ class NotificationService {
     final now = DateTime.now();
 
     if (currentIndex >= timesStr.length) {
-      return; // Todas as notificações do dia foram agendadas
+      print('Todas as notificações do dia foram agendadas.');
+      return;
     }
 
     final times = timesStr.map((str) => DateTime.parse(str)).toList();
     final nextTime = times[currentIndex];
 
     if (nextTime.isBefore(now)) {
-      // Se o horário já passou, avance para o próximo
+      print('Horário $nextTime já passou. Avançando para o próximo.');
       await prefs.setInt('current_notification_index', currentIndex + 1);
       await _scheduleNextNotification();
       return;
     }
 
+    print('Agendando notificação para $nextTime (ID: $currentIndex)');
     await _scheduleNotification(
       id: currentIndex,
       title: 'Hora de preencher o questionário! (${currentIndex + 1}/8)',
@@ -144,7 +151,7 @@ class NotificationService {
           playSound: true,
           enableVibration: true,
           color: Colors.blue,
-          //smallIcon: '@mipmap/ic_launcher', // Adiciona o ícone do app
+          //smallIcon: '@mipmap/ic_launcher', // Ícone do app
         );
 
     const NotificationDetails details = NotificationDetails(
@@ -157,7 +164,6 @@ class NotificationService {
       body,
       tzTime,
       details,
-      // ignore: deprecated_member_use
       androidAllowWhileIdle: true,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
@@ -238,7 +244,7 @@ class NotificationService {
   Future<bool> isWithinNotificationWindow() async {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day, 9);
-    final endOfDay = DateTime(now.year, now.month, now.day, 21);
+    final endOfDay = DateTime.now().add(const Duration(hours: 12)); // 21h
     return now.isAfter(startOfDay) && now.isBefore(endOfDay);
   }
 
