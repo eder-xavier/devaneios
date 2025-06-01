@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'home_page.dart';
-import '../utils/notification_service.dart';
+import 'package:devaneios/utils/notification_service.dart';
+import 'package:devaneios/utils/theme_manager.dart';
+import 'package:devaneios/screens/home_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -55,113 +56,122 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cadastro'),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-      ),
-      extendBodyBehindAppBar: true,
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/forest_background.png'),
-            fit: BoxFit.cover,
+    final themeManager = ThemeManager.of(context);
+
+    return ValueListenableBuilder<String>(
+      valueListenable: themeManager.backgroundImage,
+      builder: (context, backgroundImage, child) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Cadastro'),
+            elevation: 0,
+            backgroundColor: const Color.fromARGB(0, 255, 255, 255),
           ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Form(
-              key: _formKey,
-              child: ListView(
-                children: [
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Bem-vindo ao Devaneios',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black54,
-                          offset: Offset(2, 2),
-                          blurRadius: 4,
+          extendBodyBehindAppBar: true,
+          body: Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/$backgroundImage.png'),
+                fit: BoxFit.cover,
+              ),
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    children: [
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Bem-vindo ao Devaneios',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black54,
+                              offset: Offset(2, 2),
+                              blurRadius: 4,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 40),
-                  _buildTextField(
-                    controller: _nameController,
-                    label: 'Nome',
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Por favor, insira seu nome';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTextField(
-                    controller: _emailController,
-                    label: 'E-mail',
-                    validator: (value) {
-                      if (value == null || !value.contains('@')) {
-                        return 'Por favor, insira um e-mail válido';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTextField(
-                    controller: _ageController,
-                    label: 'Idade',
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || int.tryParse(value) == null) {
-                        return 'Por favor, insira uma idade válida';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 40),
-                  ElevatedButton(
-                    onPressed: () {
-                      print('Botão Cadastrar pressionado.');
-                      if (_formKey.currentState!.validate()) {
-                        print('Formulário validado. Chamando _saveUserData...');
-                        _saveUserData();
-                      } else {
-                        print('Formulário não validado.');
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A6A7A),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        textAlign: TextAlign.center,
                       ),
-                      elevation: 5,
-                      shadowColor: Colors.black54,
-                    ),
-                    child: const Text(
-                      'Cadastrar',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(height: 40),
+                      _buildTextField(
+                        controller: _nameController,
+                        label: 'Nome',
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Por favor, insira seu nome';
+                          }
+                          return null;
+                        },
                       ),
-                    ),
+                      const SizedBox(height: 20),
+                      _buildTextField(
+                        controller: _emailController,
+                        label: 'E-mail',
+                        validator: (value) {
+                          if (value == null || !value.contains('@')) {
+                            return 'Por favor, insira um e-mail válido';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      _buildTextField(
+                        controller: _ageController,
+                        label: 'Idade',
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || int.tryParse(value) == null) {
+                            return 'Por favor, insira uma idade válida';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 40),
+                      ElevatedButton(
+                        onPressed: () {
+                          print('Botão Cadastrar pressionado.');
+                          if (_formKey.currentState!.validate()) {
+                            print(
+                              'Formulário validado. Chamando _saveUserData...',
+                            );
+                            _saveUserData();
+                          } else {
+                            print('Formulário não validado.');
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4A6A7A),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 5,
+                          shadowColor: Colors.black54,
+                        ),
+                        child: const Text(
+                          'Cadastrar',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

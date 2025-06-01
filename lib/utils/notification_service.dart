@@ -88,6 +88,7 @@ class NotificationService {
           playSound: true,
           enableVibration: true,
           showWhen: false,
+          icon: '@mipmap/ic_launcher',
         );
 
     const NotificationDetails details = NotificationDetails(
@@ -131,31 +132,42 @@ class NotificationService {
       print('Agendando 7 notificações restantes para hoje...');
       await _scheduleRemainingDailyNotifications(now, 7);
     } else {
-      print(
-        'Fora do intervalo. Agendando 8 notificações para o dia seguinte...',
-      );
-      final tomorrow = today.add(const Duration(days: 1));
-      final startTime = DateTime(
-        tomorrow.year,
-        tomorrow.month,
-        tomorrow.day,
-        9,
-      );
-      final endTime = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 21);
+      print('Fora do intervalo. Verificando se é antes das 9h...');
+      if (now.isBefore(startOfDay)) {
+        print(
+          'Horário antes das 9h. Agendando 8 notificações para hoje a partir das 9h...',
+        );
+        await _scheduleRemainingDailyNotifications(startOfDay, 8);
+      } else {
+        print('Após as 21h. Agendando 8 notificações para o dia seguinte...');
+        final tomorrow = today.add(const Duration(days: 1));
+        final startTime = DateTime(
+          tomorrow.year,
+          tomorrow.month,
+          tomorrow.day,
+          9,
+        );
+        final endTime = DateTime(
+          tomorrow.year,
+          tomorrow.month,
+          tomorrow.day,
+          21,
+        );
 
-      final times = _generateRandomTimes(startTime, endTime, 8, 17);
-      print(
-        'Horários gerados para o dia seguinte: ${times.map((t) => t.toIso8601String())}',
-      );
+        final times = _generateRandomTimes(startTime, endTime, 8, 17);
+        print(
+          'Horários gerados para o dia seguinte: ${times.map((t) => t.toIso8601String())}',
+        );
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(
-        'notification_times',
-        times.map((time) => time.toIso8601String()).toList(),
-      );
-      await prefs.setInt('current_notification_index', 0);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(
+          'notification_times',
+          times.map((time) => time.toIso8601String()).toList(),
+        );
+        await prefs.setInt('current_notification_index', 0);
 
-      await _scheduleNextNotification();
+        await _scheduleNextNotification();
+      }
     }
     print('Agendamento após cadastro concluído.');
   }
@@ -269,6 +281,7 @@ class NotificationService {
           playSound: true,
           enableVibration: true,
           showWhen: false,
+          icon: '@mipmap/ic_launcher',
         );
 
     const NotificationDetails details = NotificationDetails(
@@ -298,7 +311,11 @@ class NotificationService {
     final currentIndex = prefs.getInt('current_notification_index') ?? 0;
     final now = DateTime.now();
 
-    if (currentIndex >= timesStr.length) return;
+    if (currentIndex >= timesStr.length) {
+      print('Nenhuma notificação pendente. Reagendando para o dia atual...');
+      await scheduleDailyNotifications();
+      return;
+    }
 
     final times = timesStr.map((str) => DateTime.parse(str)).toList();
     final nextTime = times[currentIndex];
@@ -311,10 +328,12 @@ class NotificationService {
         id: currentIndex,
         title: 'Hora de preencher o questionário! (${currentIndex + 1}/8)',
         body: 'Clique para responder ao questionário de devaneios.',
-        scheduledTime: now, // Exibir imediatamente
+        scheduledTime: now,
       );
       await prefs.setInt('current_notification_index', currentIndex + 1);
       await _scheduleNextNotification();
+    } else {
+      print('Próxima notificação agendada para $nextTime. Aguardando...');
     }
   }
 

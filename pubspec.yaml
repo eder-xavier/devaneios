@@ -62,6 +62,7 @@ dev_dependencies:
 flutter:
   assets:
     - assets/forest_background.png
+    - assets/forest_background2.png
     - assets/icons/parrot_icon.png
 
   # The following line ensures that the Material Icons font is

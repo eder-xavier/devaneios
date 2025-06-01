@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'screens/auth_check.dart';
 import 'utils/notification_service.dart';
+import 'utils/theme_manager.dart';
 // ignore: depend_on_referenced_packages
 import 'package:permission_handler/permission_handler.dart';
 
@@ -39,39 +40,41 @@ class _DevaneiosAppState extends State<DevaneiosApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Devaneios',
-      theme: ThemeData(
-        primaryColor: const Color(0xFF1C2526),
-        colorScheme: ColorScheme.fromSwatch(
-          primarySwatch: createMaterialColor(const Color(0xFF1C2526)),
-          accentColor: const Color(0xFF4A6A7A),
-          backgroundColor: const Color(0xFFA7C5D2),
-          cardColor: const Color(0xFF6E8290),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Color(0xFF1C2526)),
-          bodyMedium: TextStyle(color: Color(0xFF1C2526)),
-          titleLarge: TextStyle(color: Colors.white),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFA7C5D2),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4A6A7A),
-            foregroundColor: Colors.white,
+    return ThemeManager(
+      child: MaterialApp(
+        title: 'Devaneios',
+        theme: ThemeData(
+          primaryColor: const Color(0xFF1C2526),
+          colorScheme: ColorScheme.fromSwatch(
+            primarySwatch: createMaterialColor(const Color(0xFF1C2526)),
+            accentColor: const Color(0xFF4A6A7A),
+            backgroundColor: const Color(0xFFA7C5D2),
+            cardColor: const Color(0xFF6E8290),
+          ),
+          textTheme: const TextTheme(
+            bodyLarge: TextStyle(color: Color(0xFF1C2526)),
+            bodyMedium: TextStyle(color: Color(0xFF1C2526)),
+            titleLarge: TextStyle(color: Colors.white),
+          ),
+          scaffoldBackgroundColor: const Color(0xFFA7C5D2),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4A6A7A),
+              foregroundColor: Colors.white,
+            ),
+          ),
+          inputDecorationTheme: const InputDecorationTheme(
+            labelStyle: TextStyle(color: Color(0xFF1C2526)),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF4A6A7A)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF6E8290)),
+            ),
           ),
         ),
-        inputDecorationTheme: const InputDecorationTheme(
-          labelStyle: TextStyle(color: Color(0xFF1C2526)),
-          focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Color(0xFF4A6A7A)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Color(0xFF6E8290)),
-          ),
-        ),
+        home: const AuthCheck(),
       ),
-      home: const AuthCheck(),
     );
   }
 }
@@ -79,6 +82,7 @@ class _DevaneiosAppState extends State<DevaneiosApp> {
 MaterialColor createMaterialColor(Color color) {
   List strengths = <double>[.05];
   Map<int, Color> swatch = {};
+  // ignore: deprecated_member_use
   final int r = color.red, g = color.green, b = color.blue;
 
   for (int i = 1; i < 10; i++) {
@@ -93,5 +97,6 @@ MaterialColor createMaterialColor(Color color) {
       1,
     );
   }
+  // ignore: deprecated_member_use
   return MaterialColor(color.value, swatch);
 }

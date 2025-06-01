@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/notification_service.dart';
+import 'package:devaneios/utils/notification_service.dart';
+import 'package:devaneios/utils/theme_manager.dart';
+import 'package:devaneios/screens/home_page.dart';
 
 class QuestionnairePage extends StatefulWidget {
   const QuestionnairePage({super.key});
@@ -58,165 +60,176 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Questionário de Devaneios'),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-      ),
-      extendBodyBehindAppBar: true,
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/forest_background.png'),
-            fit: BoxFit.cover,
+    final themeManager = ThemeManager.of(context);
+
+    return ValueListenableBuilder<String>(
+      valueListenable: themeManager.backgroundImage,
+      builder: (context, backgroundImage, child) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Questionário de Devaneios'),
+            elevation: 0,
+            backgroundColor: Colors.transparent,
           ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Form(
-              key: _formKey,
-              child: ListView(
-                children: [
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Questionário de Bem-Estar',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black54,
-                          offset: Offset(2, 2),
-                          blurRadius: 4,
+          extendBodyBehindAppBar: true,
+          body: Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/$backgroundImage.png'),
+                fit: BoxFit.cover,
+              ),
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    children: [
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Questionário de Bem-Estar',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black54,
+                              offset: Offset(2, 2),
+                              blurRadius: 4,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  for (int i = 0; i < _questions.length; i++)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 8,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            _questions[i],
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1C2526),
-                            ),
-                          ),
-                        ),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 8,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: DropdownButtonFormField<int>(
-                            decoration: const InputDecoration(
-                              labelText: 'Selecione uma opção',
-                              labelStyle: TextStyle(color: Color(0xFF1C2526)),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                            value: _answers[i],
-                            items: const [
-                              DropdownMenuItem(
-                                value: 0,
-                                child: Text('Não ocorre'),
-                              ),
-                              DropdownMenuItem(
-                                value: 1,
-                                child: Text('Ocorre vários dias'),
-                              ),
-                              DropdownMenuItem(
-                                value: 2,
-                                child: Text('Ocorre mais da metade dos dias'),
-                              ),
-                              DropdownMenuItem(
-                                value: 3,
-                                child: Text('Ocorre todos os dias'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _answers[i] = value;
-                              });
-                            },
-                            validator: (value) {
-                              if (value == null) {
-                                return 'Por favor, selecione uma opção';
-                              }
-                              return null;
-                            },
-                            dropdownColor: Colors.white,
-                            style: const TextStyle(
-                              color: Color(0xFF1C2526),
-                              fontSize: 16,
-                            ),
-                            icon: const Icon(
-                              Icons.arrow_drop_down,
-                              color: Color(0xFF4A6A7A),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _saveAnswers,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A6A7A),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        textAlign: TextAlign.center,
                       ),
-                      elevation: 5,
-                      shadowColor: Colors.black54,
-                    ),
-                    child: const Text(
-                      'Enviar Respostas',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(height: 20),
+                      for (int i = 0; i < _questions.length; i++)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                _questions[i],
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1C2526),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: DropdownButtonFormField<int>(
+                                decoration: const InputDecoration(
+                                  labelText: 'Selecione uma opção',
+                                  labelStyle: TextStyle(
+                                    color: Color(0xFF1C2526),
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                value: _answers[i],
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 0,
+                                    child: Text('Não ocorre'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 1,
+                                    child: Text('Ocorre vários dias'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 2,
+                                    child: Text(
+                                      'Ocorre mais da metade dos dias',
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 3,
+                                    child: Text('Ocorre todos os dias'),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    _answers[i] = value;
+                                  });
+                                },
+                                validator: (value) {
+                                  if (value == null) {
+                                    return 'Por favor, selecione uma opção';
+                                  }
+                                  return null;
+                                },
+                                dropdownColor: Colors.white,
+                                style: const TextStyle(
+                                  color: Color(0xFF1C2526),
+                                  fontSize: 16,
+                                ),
+                                icon: const Icon(
+                                  Icons.arrow_drop_down,
+                                  color: Color(0xFF4A6A7A),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                        ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: _saveAnswers,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4A6A7A),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 5,
+                          shadowColor: Colors.black54,
+                        ),
+                        child: const Text(
+                          'Enviar Respostas',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
