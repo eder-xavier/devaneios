@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'screens/auth_check.dart';
 import 'utils/notification_service.dart';
+// ignore: depend_on_referenced_packages
+import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,16 +13,7 @@ void main() async {
   tz.initializeTimeZones();
   final notificationService = NotificationService();
   await notificationService.initialize();
-
-  // Verificar se o usuário está registrado e agendar notificações
-  final prefs = await SharedPreferences.getInstance();
-  final isRegistered = prefs.getBool('is_registered') ?? false;
-  if (isRegistered) {
-    print('Usuário registrado. Agendando notificações...');
-    await notificationService.scheduleDailyNotifications();
-  } else {
-    print('Usuário não registrado. Agendamento de notificações adiado.');
-  }
+  await requestNotificationPermission();
 
   runApp(const DevaneiosApp());
 }
@@ -30,6 +23,12 @@ class DevaneiosApp extends StatefulWidget {
 
   @override
   State<DevaneiosApp> createState() => _DevaneiosAppState();
+}
+
+Future<void> requestNotificationPermission() async {
+  if (await Permission.notification.isDenied) {
+    await Permission.notification.request();
+  }
 }
 
 class _DevaneiosAppState extends State<DevaneiosApp> {
@@ -81,7 +80,6 @@ class _DevaneiosAppState extends State<DevaneiosApp> {
 MaterialColor createMaterialColor(Color color) {
   List strengths = <double>[.05];
   Map<int, Color> swatch = {};
-  // ignore: deprecated_member_use
   final int r = color.red, g = color.green, b = color.blue;
 
   for (int i = 1; i < 10; i++) {

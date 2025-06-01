@@ -25,16 +25,19 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
   ];
 
   Future<void> _saveAnswers() async {
+    print('Iniciando _saveAnswers...');
     if (_formKey.currentState!.validate()) {
+      print('Formulário validado. Salvando respostas...');
       _formKey.currentState!.save();
       try {
         final prefs = await SharedPreferences.getInstance();
         final timestamp = DateTime.now().toIso8601String();
         final answersJson = _answers.join(',');
         await prefs.setString('questionnaire_$timestamp', answersJson);
+        print('Respostas salvas no SharedPreferences.');
 
-        // Chama o método do NotificationService apenas se o salvamento for bem-sucedido
         await NotificationService().markQuestionnaireAnswered();
+        print('markQuestionnaireAnswered chamado.');
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Respostas salvas com sucesso!')),
@@ -48,6 +51,8 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
           ),
         );
       }
+    } else {
+      print('Formulário não validado.');
     }
   }
 

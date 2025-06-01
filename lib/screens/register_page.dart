@@ -30,17 +30,21 @@ class _RegisterPageState extends State<RegisterPage> {
       } else {
         await prefs.setInt('user_age', age);
       }
+      await prefs.setBool('is_registered', true); // Marcar como registrado
       print('Dados salvos com sucesso.');
 
-      print('Agendando notificações diárias...');
-      await NotificationService().scheduleDailyNotifications();
-      print('Notificações diárias agendadas com sucesso.');
+      print('Agendando notificações após cadastro...');
+      await NotificationService().scheduleNotificationsAfterRegistration();
+      print('Notificações agendadas com sucesso.');
 
       print('Navegando para HomePage...');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
+        );
+      }
     } catch (e) {
       print('Erro ao salvar dados do usuário: $e');
       ScaffoldMessenger.of(context).showSnackBar(

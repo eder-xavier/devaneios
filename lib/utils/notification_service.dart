@@ -7,6 +7,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 
+// Função estática para lidar com notificações em background
+@pragma('vm:entry-point')
+void backgroundNotificationHandler(NotificationResponse details) {
+  print('Notificação clicada em background: $details');
+  NotificationService()._onNotificationReceived.add('notification_clicked');
+}
+
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -43,6 +50,8 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
       ledColor: Colors.blue,
+      showBadge: true,
+      enableLights: true,
     );
 
     await _notificationsPlugin
@@ -51,53 +60,141 @@ class NotificationService {
         >()
         ?.createNotificationChannel(channel);
 
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.requestNotificationsPermission();
+
     await _notificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (details) {
         _onNotificationReceived.add('notification_clicked');
+        print('Notificação clicada: $details');
       },
+      onDidReceiveBackgroundNotificationResponse: backgroundNotificationHandler,
     );
     print('NotificationService inicializado com sucesso.');
   }
 
-  Future<void> scheduleDailyNotifications() async {
+  Future<void> sendImmediateNotification() async {
+    print('Tentando enviar notificação imediata...');
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription: 'Notificações imediatas para o app Devaneios',
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+          showWhen: false,
+        );
+
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+    );
+
+    try {
+      await _notificationsPlugin.show(
+        0,
+        'Bem-vindo ao Devaneios!',
+        'Clique para preencher seu primeiro questionário.',
+        details,
+        payload: 'first_questionnaire',
+      );
+      print('Notificação imediata enviada com sucesso.');
+    } catch (e) {
+      print('Erro ao enviar notificação imediata: $e');
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final dailyCount = prefs.getInt(_countKey) ?? 0;
+    await prefs.setInt(_countKey, dailyCount + 1);
+    print('Contagem diária atualizada para: ${dailyCount + 1}');
+
+    _onNotificationReceived.add('notification_clicked');
+  }
+
+  Future<void> scheduleNotificationsAfterRegistration() async {
+    print('Iniciando agendamento de notificações após cadastro...');
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-
-    // Definir o início (9h) e fim (21h) do dia atual
     final startOfDay = today.add(const Duration(hours: 9));
     final endOfDay = today.add(const Duration(hours: 21));
 
-    // Se já passou das 21h, agendar para o dia seguinte
-    final baseDate = now.isAfter(endOfDay)
-        ? today.add(const Duration(days: 1))
-        : today;
+    final isWithinWindow = now.isAfter(startOfDay) && now.isBefore(endOfDay);
+    print('Horário atual: $now. Dentro do intervalo (9h-21h): $isWithinWindow');
 
-    final startTime = DateTime(baseDate.year, baseDate.month, baseDate.day, 9);
-    final endTime = DateTime(baseDate.year, baseDate.month, baseDate.day, 21);
+    await sendImmediateNotification();
 
-    print('Gerando horários entre $startTime e $endTime');
+    if (isWithinWindow) {
+      print('Agendando 7 notificações restantes para hoje...');
+      await _scheduleRemainingDailyNotifications(now, 7);
+    } else {
+      print(
+        'Fora do intervalo. Agendando 8 notificações para o dia seguinte...',
+      );
+      final tomorrow = today.add(const Duration(days: 1));
+      final startTime = DateTime(
+        tomorrow.year,
+        tomorrow.month,
+        tomorrow.day,
+        9,
+      );
+      final endTime = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 21);
 
-    // Gerar 8 horários aleatórios entre 9h e 21h
-    final times = _generateRandomTimes(startTime, endTime, 8, 17);
+      final times = _generateRandomTimes(startTime, endTime, 8, 17);
+      print(
+        'Horários gerados para o dia seguinte: ${times.map((t) => t.toIso8601String())}',
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        'notification_times',
+        times.map((time) => time.toIso8601String()).toList(),
+      );
+      await prefs.setInt('current_notification_index', 0);
+
+      await _scheduleNextNotification();
+    }
+    print('Agendamento após cadastro concluído.');
+  }
+
+  Future<void> scheduleDailyNotifications() async {
+    print('Agendando notificações diárias...');
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final startTime = DateTime(today.year, today.month, today.day, 9);
+    final endTime = DateTime(today.year, today.month, today.day, 21);
+
+    await _scheduleRemainingDailyNotifications(now, 8);
+  }
+
+  Future<void> _scheduleRemainingDailyNotifications(
+    DateTime startFrom,
+    int count,
+  ) async {
+    print('Agendando $count notificações restantes a partir de $startFrom...');
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final endOfDay = today.add(const Duration(hours: 21));
+
+    final effectiveStart = startFrom.isBefore(now) ? now : startFrom;
+
+    final times = _generateRandomTimes(effectiveStart, endOfDay, count, 17);
     print('Horários gerados: ${times.map((t) => t.toIso8601String())}');
 
-    // Cancelar notificações anteriores
     await _notificationsPlugin.cancelAll();
 
-    // Salvar os horários no SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
       'notification_times',
       times.map((time) => time.toIso8601String()).toList(),
     );
     await prefs.setInt('current_notification_index', 0);
-    await prefs.setInt(
-      _countKey,
-      prefs.getInt(_countKey) ?? 0,
-    ); // Manter contagem existente
+    await prefs.setInt(_countKey, prefs.getInt(_countKey) ?? 0);
 
-    // Agendar a primeira notificação
     await _scheduleNextNotification();
   }
 
@@ -109,6 +206,28 @@ class NotificationService {
 
     if (currentIndex >= timesStr.length) {
       print('Todas as notificações do dia foram agendadas.');
+      final tomorrow = now.add(const Duration(days: 1));
+      final startTime = DateTime(
+        tomorrow.year,
+        tomorrow.month,
+        tomorrow.day,
+        9,
+      );
+      final endTime = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 21);
+
+      final times = _generateRandomTimes(startTime, endTime, 8, 17);
+      print(
+        'Horários gerados para o dia seguinte: ${times.map((t) => t.toIso8601String())}',
+      );
+
+      await prefs.setStringList(
+        'notification_times',
+        times.map((time) => time.toIso8601String()).toList(),
+      );
+      await prefs.setInt('current_notification_index', 0);
+      await prefs.setInt(_countKey, 0);
+
+      await _scheduleNextNotification();
       return;
     }
 
@@ -131,7 +250,6 @@ class NotificationService {
     );
 
     await prefs.setString(_prefsKey, now.toIso8601String());
-    _onNotificationReceived.add('notification_scheduled');
   }
 
   Future<void> _scheduleNotification({
@@ -146,28 +264,58 @@ class NotificationService {
         AndroidNotificationDetails(
           _channelId,
           _channelName,
+          channelDescription: 'Notificações agendadas para o app Devaneios',
           importance: Importance.max,
-          priority: Priority.high,
           playSound: true,
           enableVibration: true,
-          color: Colors.blue,
-          //smallIcon: '@mipmap/ic_launcher', // Ícone do app
+          showWhen: false,
         );
 
     const NotificationDetails details = NotificationDetails(
       android: androidDetails,
     );
 
-    await _notificationsPlugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tzTime,
-      details,
-      androidAllowWhileIdle: true,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+    try {
+      await _notificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzTime,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      print('Notificação agendada com sucesso para $tzTime');
+    } catch (e) {
+      print('Erro ao agendar notificação: $e');
+    }
+  }
+
+  Future<void> checkPendingNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final timesStr = prefs.getStringList('notification_times') ?? [];
+    final currentIndex = prefs.getInt('current_notification_index') ?? 0;
+    final now = DateTime.now();
+
+    if (currentIndex >= timesStr.length) return;
+
+    final times = timesStr.map((str) => DateTime.parse(str)).toList();
+    final nextTime = times[currentIndex];
+
+    if (nextTime.isBefore(now)) {
+      print(
+        'Notificação pendente encontrada para $nextTime. Exibindo agora...',
+      );
+      await _scheduleNotification(
+        id: currentIndex,
+        title: 'Hora de preencher o questionário! (${currentIndex + 1}/8)',
+        body: 'Clique para responder ao questionário de devaneios.',
+        scheduledTime: now, // Exibir imediatamente
+      );
+      await prefs.setInt('current_notification_index', currentIndex + 1);
+      await _scheduleNextNotification();
+    }
   }
 
   List<DateTime> _generateRandomTimes(
@@ -183,12 +331,13 @@ class NotificationService {
     final minTotalInterval = (count - 1) * minIntervalMinutes;
 
     if (totalMinutes < minTotalInterval) {
-      throw Exception(
-        'Não há tempo suficiente para agendar com o intervalo mínimo.',
+      print(
+        'Não há tempo suficiente para agendar $count notificações com intervalo de $minIntervalMinutes minutos. Ajustando para o tempo disponível.',
       );
+      count = (totalMinutes / minIntervalMinutes).floor() + 1;
     }
 
-    final availableMinutes = totalMinutes - minTotalInterval;
+    final availableMinutes = totalMinutes - ((count - 1) * minIntervalMinutes);
     final List<int> intervals = List.generate(
       count - 1,
       (_) => minIntervalMinutes,
@@ -215,36 +364,25 @@ class NotificationService {
     return times..sort();
   }
 
-  Future<bool> canShowNextNotification() async {
-    final prefs = await SharedPreferences.getInstance();
-    final lastTimeStr = prefs.getString(_prefsKey);
-    if (lastTimeStr == null) return false;
-
-    final lastTime = DateTime.parse(lastTimeStr);
-    return DateTime.now().difference(lastTime).inMinutes < 17;
-  }
-
   Future<void> markQuestionnaireAnswered() async {
     final prefs = await SharedPreferences.getInstance();
     final currentIndex = prefs.getInt('current_notification_index') ?? 0;
     final dailyCount = prefs.getInt(_countKey) ?? 0;
 
-    // Incrementar contagem diária
     await prefs.setInt(_countKey, dailyCount + 1);
 
-    // Avançar para a próxima notificação
     await prefs.setInt('current_notification_index', currentIndex + 1);
     await prefs.remove(_prefsKey);
     _onNotificationReceived.add('questionnaire_answered');
+    print('Questionário respondido. Contagem diária: ${dailyCount + 1}');
 
-    // Agendar a próxima notificação
     await _scheduleNextNotification();
   }
 
   Future<bool> isWithinNotificationWindow() async {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day, 9);
-    final endOfDay = DateTime.now().add(const Duration(hours: 12)); // 21h
+    final endOfDay = DateTime(now.year, now.month, now.day, 21);
     return now.isAfter(startOfDay) && now.isBefore(endOfDay);
   }
 

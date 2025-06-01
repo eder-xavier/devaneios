@@ -24,6 +24,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _checkDailyCount();
     _setupNotificationListener();
+    _checkPendingNotifications(); // Verificar notificações pendentes ao iniciar
   }
 
   @override
@@ -52,6 +53,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _checkDailyCount() async {
     final count = await NotificationService().getDailyQuestionnaireCount();
+    print('Contagem diária obtida: $count');
     if (mounted) {
       setState(() {
         _dailyCount = count;
@@ -59,26 +61,30 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _checkPendingNotifications() async {
+    await NotificationService().checkPendingNotifications();
+  }
+
   void _setupNotificationListener() {
+    print('Configurando listener de notificações...');
     _notificationSubscription = NotificationService().onNotificationReceived
         .listen((event) {
-          print('Evento recebido: $event');
-          if (event == 'notification_scheduled') {
-            setState(() {
-              _showQuestionnaireButton = true;
-            });
+          print('Evento recebido na HomePage: $event');
+          if (event == 'notification_clicked') {
+            if (mounted) {
+              setState(() {
+                _showQuestionnaireButton = true;
+                print('Botão de questionário exibido.');
+              });
+            }
           } else if (event == 'questionnaire_answered') {
-            setState(() {
-              _showQuestionnaireButton = false;
-            });
-            _checkDailyCount();
-          } else if (event == 'notification_clicked') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const QuestionnairePage(),
-              ),
-            );
+            if (mounted) {
+              setState(() {
+                _showQuestionnaireButton = false;
+                print('Botão de questionário ocultado.');
+              });
+              _checkDailyCount();
+            }
           }
         });
   }
@@ -106,7 +112,6 @@ class _HomePageState extends State<HomePage> {
               child: SafeArea(
                 child: Column(
                   children: [
-                    // Cabeçalho
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16.0,
@@ -149,7 +154,6 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ),
                     ),
-                    // Corpo principal
                     Expanded(
                       child: Center(
                         child: Column(
@@ -175,15 +179,14 @@ class _HomePageState extends State<HomePage> {
                                     elevation: 5,
                                     shadowColor: Colors.black38,
                                   ),
-                                  onPressed: () async {
-                                    await Navigator.push(
+                                  onPressed: () {
+                                    Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) =>
                                             const QuestionnairePage(),
                                       ),
                                     );
-                                    // O evento 'questionnaire_answered' será disparado pela QuestionnairePage
                                   },
                                   child: const Text(
                                     'Preencher Questionário',
